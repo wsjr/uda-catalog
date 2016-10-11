@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+
+	<div class = 'flash'>
+		{% with messages = get_flashed_messages() %}
+      		{% if messages %}
+        		<ul>
+        		{% for message in messages %}
+            		<li> <strong> {{ message }} </strong> </li>
+        		{% endfor %}
+        		</ul>
+        	{% endif %}
+    	{% endwith %}
+	</div>
+
+	<div class="table-responsive no-border">
+		<table class="table">
+			<tbody>
+				<tr>
+					<td class="left-cell no-border">
+						<div class="list-group category-list-group">
+							<table>
+								<tr>
+									<td class="title">Categories</td>
+									<td class="right-icon-cell">
+										<div class="fontawesome-plus-sign active catalog-icon" 
+											onclick="location.href='{{url_for('addCategory')}}';"/>
+									</td>
+								</tr>
+							</table>
+							{% for category in categories %}
+								{% if selected_category and selected_category.name == category.name %}
+									<a href = '{{url_for('viewCategory', category=category.name)}}' 
+										class="list-group-item no-border active">
+										{{category.name}}
+									</a>
+								{% else %}
+									<a href = '{{url_for('viewCategory', category=category.name)}}' 
+										class="list-group-item no-border">	
+										{{category.name}}
+										
+
+									</a>
+								{% endif %}
+									<div class="category-options-left">
+										<div class="fontawesome-pencil active catalog-icon-inline" 
+	onclick="location.href='{{url_for('editCategory', category=category.name)}}'"></div>
+										<div class="fontawesome-trash active catalog-icon-inline" 
+	onclick="location.href='{{url_for('deleteCategory', category=category.name)}}'"></div>
+									</div>							
+								
+
+							{% endfor %}
+						</div>
+					</td>
+					<td class="right-cell no-border">
+						<div class="list-group">
+							<table>
+								<tr>
+									<td class="title">{{item_title}}</td>
+									<td class="right-icon-cell">
+										{% if selected_category %}
+											<div class="fontawesome-plus-sign active catalog-icon" 
+												onclick="location.href='{{url_for('addItemToCategory', category=selected_category.name)}}';"/>
+										{% else %}
+											<div class="fontawesome-plus-sign active catalog-icon" 
+												onclick="location.href='{{url_for('addItem')}}';"/>
+										{% endif %}
+									</td>
+								</tr>
+							</table>
+							{% for item in items %}
+								{% for category in categories %}
+									{% if category.id == item.category_id %}
+										<a href = "{{url_for('viewItem', category=category.name, item=item.title)}}" 
+											class="list-group-item no-border ">
+											{{item.title}} <i>({{category.name}})</i>
+										</a>
+									{% endif %}
+								{% endfor %}
+							{% endfor %}
+						</div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+
+{% endblock %}
+
+{% block backbutton %}
+{% endblock %}

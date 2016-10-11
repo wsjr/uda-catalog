@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+
+	<p class="title">{{title}}</p>
+	
+	<span class="error">{{error}}</span>
+
+	<form action="#" method = "post">
+		<table class="form-table">
+			<tr>
+				<td>Name:</td>
+				<td>
+					<input type="text" class="form-control" maxlength="100" name="name" value={{name}}>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2">
+					<input type="hidden" name="category_id" value="{{category_id}}">
+					<input type="submit" value="Submit">
+					<input type="button" value="Cancel" onClick="window.location='{{url_for('listCatalogsAndLatestItems')}}';">
+				</td>
+			</tr>
+		</table>
+	</form>
+
+{% endblock %}
+
+{% block backbutton %}
+{% endblock %}

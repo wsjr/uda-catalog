@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+	<table class="form-table">
+		<tr>
+			<td>Name:</td>
+			<td>{{title}}</td>
+		</tr>
+		<tr>
+			<td>Description:</td>
+			<td>{{description}}</td>
+		</tr>
+		<tr>
+			<td>Category:</td>
+			<td>{{category}}</td>
+		</tr>
+		<tr>
+			<td colspan="2">
+				<div class="fontawesome-pencil active catalog-icon-inline" 
+					onclick="location.href='{{url_for('editItem', category=category, item=item)}}'"></div>
+				<div class="fontawesome-trash active catalog-icon-inline" 
+					onclick="location.href='{{url_for('deleteItem', category=category, item=item)}}'"></div>
+				<div class="fontawesome-home active catalog-icon-inline" 
+					onclick="location.href='{{url_for('listCatalogsAndLatestItems')}}'"></div>
+			</td>
+		</tr>
+	</table>
+{% endblock %}
+
+{% block backbutton %}
+{% endblock %}
