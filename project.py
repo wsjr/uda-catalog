@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, jsonify, \
+                  url_for, flash
 from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Category, Item
@@ -16,13 +17,67 @@ session = DBSession()
 
 LATEST_ITEMS_TO_DISPLAY_COUNT = 8
 
+# Helper functions
+
+
+def getCategoryByName(name):
+    try:
+        return session.query(Category).filter_by(name=name).one()
+    except:
+        return None
+
+
+def getCategoryById(cid):
+    try:
+        return session.query(Category).filter_by(id=cid).one()
+    except:
+        return None
+
+
+def getCategories():
+    try:
+        return session.query(Category).all()
+    except:
+        return None
+
+
+def getItem(title, cid):
+    try:
+        return session.query(Item).filter_by(title=title)\
+                                  .filter_by(category_id=cid)\
+                                  .one()
+    except:
+        return None
+
+
+def getItemById(iid):
+    try:
+        return session.query(Item).filter_by(id=iid).one()
+    except:
+        return None
+
+
+def getItemsByCategoryId(cid):
+    try:
+        return session.query(Item).order_by(desc(Item.timestamp))\
+                                  .filter_by(category_id=cid)
+    except:
+        return None
+
+
+def getLatestItems():
+    try:
+        return session.query(Item).order_by(desc(Item.timestamp))\
+                                  .limit(LATEST_ITEMS_TO_DISPLAY_COUNT)
+    except:
+        return None
+
+
 # JSON ENDPOINT
-
-
 @app.route('/catalog.json')
 def getJSON():
     # Get all categories
-    categories = session.query(Category).all()
+    categories = getCategories()
 
     # Go thru each category and get all the items associated to it.
     result = []
@@ -30,7 +85,7 @@ def getJSON():
         cat_json = category.serialize
 
         # Query items by category id
-        items = session.query(Item).filter_by(category_id=category.id)
+        items = getItemsByCategoryId(cid=category.id)
         category_items = []
         for item in items:
             # Collect all items in json
@@ -47,10 +102,8 @@ def getJSON():
 @app.route('/')
 @app.route('/catalog')
 def listCatalogsAndLatestItems():
-    categories = session.query(Category).all()
-    items = session.query(Item)\
-                   .order_by(desc(Item.timestamp))\
-                   .limit(LATEST_ITEMS_TO_DISPLAY_COUNT)
+    categories = getCategories()
+    items = getLatestItems()
     item_title = 'Latest Items'
 
     return render_template(
@@ -67,16 +120,15 @@ def addCategory():
         # Check if its not null
         if len(name) == 0:
             return render_template('addcategory.html',
-                                   title='Add Category',
+                                   page_title='Add Category',
                                    name=name,
                                    error='Category name must not be empty.')
         else:
             # Check if the category exists
-            categoryToUse = session.query(
-                Category).filter_by(name=name).first()
+            categoryToUse = getCategoryByName(name=name)
             if categoryToUse is not None:
                 return render_template('addcategory.html',
-                                       title='Add Category',
+                                       page_title='Add Category',
                                        name=name,
                                        error='Category exists already.')
             else:
@@ -84,25 +136,25 @@ def addCategory():
                 newCategory = Category(name=name, user_id=1)
 
                 session.add(newCategory)
-                # flash('New Category %s Successfully Created' %
-                # newCategory.name)
                 session.commit()
-                return redirect(url_for('listCatalogsAndLatestItems'))
+
+                flash(
+                    "'{category}' Category Successfully Created"
+                    .format(category=newCategory.name))
+
+                return redirect(url_for('viewCategory',
+                                        category=newCategory.name))
     else:
-        return render_template('addcategory.html', title='Add Category')
+        return render_template('addcategory.html', page_title='Add Category')
 
 
 @app.route('/catalog/<string:category>/items', methods=['GET', 'POST'])
 def viewCategory(category):
-    categoryToUse = session.query(Category)\
-                           .filter_by(name=category)\
-                           .first()
+    categoryToUse = getCategoryByName(name=category)
     if categoryToUse is not None:
-        categoryId = categoryToUse.id
-        categories = session.query(Category).all()
-        items = session.query(Item)\
-                       .order_by(desc(Item.timestamp))\
-                       .filter_by(category_id=categoryId)
+        category_id = categoryToUse.id
+        categories = getCategories()
+        items = getItemsByCategoryId(cid=category_id)
         item_title = "{name} Items ({count} items)".format(
             name=categoryToUse.name, count=items.count())
 
@@ -118,8 +170,8 @@ def viewCategory(category):
 
 @app.route('/catalog/<string:category>/edit', methods=['GET', 'POST'])
 def editCategory(category):
-    categoryToUse = session.query(Category).filter_by(name=category).first()
-    title = "Edit Category"
+    categoryToUse = getCategoryByName(name=category)
+    page_title = "Edit Category"
     if categoryToUse is not None:
         if request.method == 'POST':
             name = request.form['name']
@@ -128,20 +180,24 @@ def editCategory(category):
             # Check if its not null
             if len(name) == 0:
                 return render_template('editcategory.html',
-                                       title=title,
+                                       page_title=page_title,
                                        name=name,
                                        category_id=categoryToUse.id,
                                        error='Category name is empty.')
             else:
-                categoryToUse = session.query(Category).filter_by(id=category_id).first()
+                categoryToUse = getCategoryById(cid=category_id)
 
                 categoryToUse.name = name
-                # Do the flash here
+
+                flash(
+                    "'{category}' Category Successfully Edited"
+                    .format(category=name))
+
                 return redirect(url_for('viewCategory',
                                         category=categoryToUse.name))
         else:
             return render_template('editcategory.html',
-                                   title=title,
+                                   page_title=page_title,
                                    name=category,
                                    category_id=categoryToUse.id)
     else:
@@ -150,25 +206,31 @@ def editCategory(category):
 
 @app.route('/catalog/<string:category>/delete', methods=['GET', 'POST'])
 def deleteCategory(category):
-    categoryToUse = session.query(Category).filter_by(name=category).first()
+    categoryToUse = getCategoryByName(name=category)
     if categoryToUse is not None:
         if request.method == 'POST':
+            categoryName = categoryToUse.name
             session.delete(categoryToUse)
             session.commit()
-            # flash('Category Successfully Deleted')
+
+            flash(
+                "'{category}' Category Successfully Deleted"
+                .format(category=categoryName))
+
             return redirect(url_for('listCatalogsAndLatestItems'))
         else:
             return render_template('deleteCategory.html', category=category)
 
     else:
         return redirect(url_for('listCatalogsAndLatestItems'))
+
 # Item
 
 
 @app.route('/catalog/additem', methods=['GET', 'POST'])
 def addItem():
-    title = 'Add Item'
-    categories = session.query(Category).all()
+    page_title = 'Add Item'
+    categories = getCategories()
 
     if request.method == 'POST':
         item_title = request.form['item_title']
@@ -179,16 +241,14 @@ def addItem():
         if len(item_title) > 0 and len(item_description) > 0\
                 and category_id > 0:
             # Ensure the item doesn't exist already
-            itemToUse = session.query(Item).filter_by(
-                title=item_title).filter_by(category_id=category_id).first()
-            categoryToUse = session.query(
-                Category).filter_by(id=category_id).first()
+            itemToUse = getItem(title=item_title, cid=category_id)
+            categoryToUse = getCategoryById(cid=category_id)
             if itemToUse is not None:
                 error = "'{item_title}' already exists under '{category}'" +\
                         " Category".format(item_title=item_title,
                                            category=categoryToUse.name)
                 return render_template('additem.html',
-                                       title=title,
+                                       page_title=page_title,
                                        error=error,
                                        item_title=item_title,
                                        item_description=item_description,
@@ -203,7 +263,11 @@ def addItem():
                                user_id=1)
 
                 session.add(newItem)
-                # flash('New Item %s Successfully Created' % newCategory.name)
+
+                flash(
+                    "'{item}' Item Successfully Created"
+                    .format(item=newItem.title))
+
                 session.commit()
 
                 return redirect(url_for('viewCategory',
@@ -217,7 +281,7 @@ def addItem():
                 error = 'Please select a category.'
 
             return render_template('additem.html',
-                                   title=title,
+                                   page_title=page_title,
                                    error=error,
                                    item_title=item_title,
                                    item_description=item_description,
@@ -226,18 +290,18 @@ def addItem():
                                    categories=categories)
     else:
         # Display the drop down list and let user pick the category
-        categories = session.query(Category).all()
+        categories = getCategories()
         return render_template('additem.html',
-                               title=title,
+                               page_title=page_title,
                                category=None,
                                categories=categories)
 
 
 @app.route('/catalog/<string:category>/add', methods=['GET', 'POST'])
 def addItemToCategory(category):
-    categoryToUse = session.query(Category).filter_by(name=category).first()
+    categoryToUse = getCategoryByName(name=category)
     if categoryToUse is not None:
-        title = "Add new item to '{category}' category".format(
+        page_title = "Add new item to '{category}' category".format(
             category=categoryToUse.name)
         if request.method == 'POST':
             item_title = request.form['item_title']
@@ -248,14 +312,13 @@ def addItemToCategory(category):
             if len(item_title) > 0 and len(item_description) > 0\
                     and category_id > 0:
                 # Ensure the item doesn't exist already
-                itemToUse = session.query(Item).filter_by(title=item_title)\
-                    .filter_by(category_id=category_id).first()
+                itemToUse = getItem(title=item_title, cid=category_id)
                 if itemToUse is not None:
-                    error = "'{item}' already exists under '{category}' " +\
-                            "Category".format(item=item_title,
-                                              category=categoryToUse.name)
+                    error = "'{item}' already exists in '{category}'"\
+                            .format(item=item_title,
+                                    category=categoryToUse.name)
                     return render_template('additem.html',
-                                           title=title,
+                                           page_title=page_title,
                                            error=error,
                                            item_title=item_title,
                                            item_description=item_description,
@@ -270,7 +333,11 @@ def addItemToCategory(category):
                                    user_id=1)
 
                     session.add(newItem)
-                    # flash('New Item %s Successfully Created' % newCategory.name)
+
+                    flash(
+                        "'{item}' Item Successfully Created in '{category}'"
+                        .format(item=item_title, category=categoryToUse.name))
+
                     session.commit()
 
                     return redirect(url_for('viewCategory',
@@ -282,7 +349,7 @@ def addItemToCategory(category):
                     error = 'Please provide a description.'
 
                 return render_template('additem.html',
-                                       title=title,
+                                       page_title=page_title,
                                        item_title=item_title,
                                        item_description=item_description,
                                        category=categoryToUse,
@@ -291,7 +358,7 @@ def addItemToCategory(category):
         else:
             # Display the drop down list and let user pick the category
             return render_template('additem.html',
-                                   title=title,
+                                   page_title=page_title,
                                    category=categoryToUse,
                                    categories=None)
     else:
@@ -300,11 +367,10 @@ def addItemToCategory(category):
 
 @app.route('/catalog/<string:category>/<string:item>', methods=['GET', 'POST'])
 def viewItem(category, item):
-    categoryToUse = session.query(Category).filter_by(name=category).first()
+    categoryToUse = getCategoryByName(name=category)
     if categoryToUse is not None:
-        categoryId = categoryToUse.id
-        itemToUse = session.query(Item).filter_by(
-            category_id=categoryId).filter_by(title=item).first()
+        category_id = categoryToUse.id
+        itemToUse = getItem(title=item, cid=category_id)
         if itemToUse is not None:
             return render_template('viewitem.html',
                                    title=itemToUse.title,
@@ -313,7 +379,7 @@ def viewItem(category, item):
                                    item=item)
         else:
             return "Error encountered for category:{category} " +\
-                "and item:{item}".format(cid=categoryId,
+                "and item:{item}".format(cid=category_id,
                                          category=category,
                                          item=item)
     else:
@@ -323,16 +389,16 @@ def viewItem(category, item):
 @app.route('/catalog/<string:category>/<string:item>/edit',
            methods=['GET', 'POST'])
 def editItem(category, item):
-    categoryToUse = session.query(Category).filter_by(name=category).first()
-    categories = session.query(Category).all()
-    title = 'Edit Item'
+    categoryToUse = getCategoryByName(name=category)
+    categories = getCategories()
+    page_title = 'Edit Item'
 
     if request.method == 'POST':
         item_title = request.form['item_title']
         item_description = request.form['item_description']
         item_id = request.form['item_id']
         category_id = int(request.form['category_id'])
-        itemToUse = session.query(Item).filter_by(id=item_id).first()
+        itemToUse = getItemById(iid=item_id)
 
         if len(item_title) > 0 and len(item_description) > 0:
             itemToUse.title = item_title
@@ -341,9 +407,11 @@ def editItem(category, item):
             itemToUse.timestamp = datetime.utcnow()
 
             # Get the name of the category
-            categoryToUse = session.query(Category)\
-                                   .filter_by(id=category_id)\
-                                   .first()
+            categoryToUse = getCategoryById(cid=category_id)
+
+            flash(
+                "'{item}' Item Successfully Edited in '{category}'"
+                .format(item=itemToUse.title, category=categoryToUse.name))
 
             return redirect(url_for('viewItem',
                                     category=categoryToUse.name,
@@ -355,7 +423,7 @@ def editItem(category, item):
                 error = 'Please provide a description.'
 
             return render_template('edititem.html',
-                                   title=title,
+                                   page_title=page_title,
                                    error=error,
                                    item_title=itemToUse.title,
                                    item_description=itemToUse.description,
@@ -364,19 +432,16 @@ def editItem(category, item):
 
     else:
         if categoryToUse is not None:
-            categoryId = categoryToUse.id
-            itemToUse = session.query(Item)\
-                               .filter_by(category_id=categoryId)\
-                               .filter_by(title=item)\
-                               .first()
+            category_id = categoryToUse.id
+            itemToUse = getItem(title=item, cid=category_id)
 
             return render_template('edititem.html',
-                                   title=title,
+                                   page_title=page_title,
                                    item_title=itemToUse.title,
                                    item_description=itemToUse.description,
                                    item_id=itemToUse.id,
                                    categories=categories,
-                                   category_id=categoryId)
+                                   category_id=category_id)
 
         else:
             return redirect(url_for('listCatalogsAndLatestItems'))
@@ -385,21 +450,22 @@ def editItem(category, item):
 @app.route('/catalog/<string:category>/<string:item>/delete',
            methods=['GET', 'POST'])
 def deleteItem(category, item):
-    categoryToUse = session.query(Category).filter_by(name=category).first()
+    categoryToUse = getCategoryByName(name=category)
     if categoryToUse is not None:
-        categoryId = categoryToUse.id
-        itemToUse = session.query(Item)\
-                           .filter_by(title=item)\
-                           .filter_by(category_id=categoryId)\
-                           .first()
+        category_id = categoryToUse.id
+        itemToUse = getItem(title=item, cid=category_id)
         if itemToUse is not None:
             if request.method == 'POST':
+                deletedItemTitle = itemToUse.title
                 session.delete(itemToUse)
                 session.commit()
-                # flash('Category Successfully Deleted')
+
+                flash(
+                    "'{item}' Item Successfully Deleted"
+                    .format(item=deletedItemTitle))
+
                 return redirect(url_for('viewCategory',
                                         category=categoryToUse.name))
-                # return redirect(url_for('listCatalogsAndLatestItems'))
             else:
                 return render_template('deleteItem.html', item_title=item)
         else:
@@ -407,19 +473,7 @@ def deleteItem(category, item):
     else:
         return redirect(url_for('listCatalogsAndLatestItems'))
 
-    categoryToDelete = session.query(Item).filter_by(title=item).first()
-    if categoryToDelete is not None:
-        if request.method == 'POST':
-            session.delete(categoryToDelete)
-            session.commit()
-            # flash('Category Successfully Deleted')
-            return redirect(url_for('listCatalogsAndLatestItems'))
-        else:
-            return render_template('deleteCategory.html', category=category)
-
-    else:
-        return redirect(url_for('listCatalogsAndLatestItems'))
-
 if __name__ == '__main__':
+    app.secret_key = 'my_catalog_app_secret_key'
     app.debug = True
     app.run(host='0.0.0.0', port=5000)

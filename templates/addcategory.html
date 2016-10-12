@@ -1,17 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
 
-	<p class="title">{{title}}</p>
+	<p class="title">{{page_title}}</p>
 	
 	<span class="error">{{error}}</span>
 
 	<form action="#" method = "post">
-		<div>
-		<label for="name">Name:</label>
-		<input type ="text" class="form-control" maxlength="100" name="name">
-		<input type="submit" value="Submit">
-		<input type="button" value="Cancel" onClick="window.location='{{url_for('listCatalogsAndLatestItems')}}';" />
-		</div>
+		<table class="form-table">
+			<tr>
+				<td>Name:</td>
+				<td>
+					<input type="text" maxlength="100" name="name" value="{{name|safe}}" placeholder="Enter category name">
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2">
+					<input type="submit" value="Submit">
+					<input type="button" value="Cancel" onClick="window.location='{{url_for('listCatalogsAndLatestItems')}}';">
+				</td>
+			</tr>
+		</table>
 	</form>
 
 {% endblock %}
