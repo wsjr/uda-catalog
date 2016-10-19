@@ -3,11 +3,11 @@
 	<table class="form-table">
 		<tr>
 			<td>Name:</td>
-			<td>{{title}}</td>
+			<td>{{itemToUse.title}}</td>
 		</tr>
 		<tr>
 			<td>Description:</td>
-			<td>{{description}}</td>
+			<td>{{itemToUse.description}}</td>
 		</tr>
 		<tr>
 			<td>Category:</td>
@@ -15,12 +15,22 @@
 		</tr>
 		<tr>
 			<td colspan="2">
-				<div class="fontawesome-pencil active catalog-icon-inline" 
-					onclick="location.href='{{url_for('editItem', category=category, item=item)}}'" alt="Edit"></div>
-				<div class="fontawesome-trash active catalog-icon-inline" 
-					onclick="location.href='{{url_for('deleteItem', category=category, item=item)}}'" alt="Delete"></div>
-				<div class="fontawesome-home active catalog-icon-inline" 
-					onclick="location.href='{{url_for('listCatalogsAndLatestItems')}}'" alt="Home"></div>
+				<a class="btn btn-primary btn-sm" 
+					href="{{url_for('listCatalogsAndLatestItems')}}" alt="Home">
+					<i class="fa fa-home"></i>&nbsp;Home
+				</a>
+				{% if 'username' in session %}
+					{% if itemToUse.user_id == session['user_id'] %}
+						<a class="btn btn-primary btn-sm" 
+							href="{{url_for('editItem', category=category, item=item)}}" alt="Edit">
+							<i class="fa fa-pencil"></i>&nbsp;Edit
+						</a>
+						<a class="btn btn-danger btn-sm" 
+							href="{{url_for('deleteItem', category=category, item=item)}}" alt="Delete">
+							<i class="fa fa-trash"></i>&nbsp;Delete
+						</a>
+					{% endif %}
+				{% endif %}
 			</td>
 		</tr>
 	</table>

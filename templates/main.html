@@ -26,10 +26,16 @@
 						<div class="list-group category-list-group">
 							<table>
 								<tr>
-									<td class="title">Categories</td>
+									<td class="title"><a href='{{url_for('listCatalogsAndLatestItems')}}'>Categories</a></td>
 									<td class="right-icon-cell">
-										<div class="fontawesome-plus-sign active catalog-icon" 
-											onclick="location.href='{{url_for('addCategory')}}';"/>
+										{% if 'username' in session %}
+											<a href="{{url_for('addCategory')}}">
+												<span class="fa-stack fa-sm	">
+													<i class="fa fa-circle fa-stack-2x"></i>
+													<i class="fa fa-plus fa-stack-1x fa-inverse"></i>
+												</span>
+											</a>
+										{% endif %}
 									</td>
 								</tr>
 							</table>
@@ -43,17 +49,22 @@
 									<a href = '{{url_for('viewCategory', category=category.name)}}' 
 										class="list-group-item no-border">	
 										{{category.name}}
-										
-
 									</a>
 								{% endif %}
-									<div class="category-options-left">
-										<div class="fontawesome-pencil active catalog-icon-inline" 
-	onclick="location.href='{{url_for('editCategory', category=category.name)}}'"></div>
-										<div class="fontawesome-trash active catalog-icon-inline" 
-	onclick="location.href='{{url_for('deleteCategory', category=category.name)}}'"></div>
-									</div>							
-								
+
+								<!-- Edit/Delete category icons -->
+								{% if 'user_id' in session and category.user_id == session['user_id'] %}
+									<div class="spacer"></div>
+									<a class="btn btn-primary btn-sm" 
+										href="{{url_for('editCategory', category=category.name)}}">
+										<i class="fa fa-pencil"></i>&nbsp;Edit
+									</a>
+									<a class="btn btn-danger btn-sm" 
+										href="{{url_for('deleteCategory', category=category.name)}}">
+										<i class="fa fa-trash"></i>&nbsp;Delete
+									</a>
+									<div class="spacer"></div>
+							{% endif %}
 
 							{% endfor %}
 						</div>
@@ -64,12 +75,17 @@
 								<tr>
 									<td class="title">{{item_title}}</td>
 									<td class="right-icon-cell">
-										{% if selected_category %}
-											<div class="fontawesome-plus-sign active catalog-icon" 
-												onclick="location.href='{{url_for('addItemToCategory', category=selected_category.name)}}';"/>
-										{% else %}
-											<div class="fontawesome-plus-sign active catalog-icon" 
-												onclick="location.href='{{url_for('addItem')}}';"/>
+										{% if 'username' in session %}
+											{% if selected_category %}
+												<a href="{{url_for('addItemToCategory', category=selected_category.name)}}">
+											{% else %}
+												<a href="{{url_for('addItem')}}">
+											{% endif %}
+													<span class="fa-stack fa-sm	">
+														<i class="fa fa-circle fa-stack-2x"></i>
+														<i class="fa fa-plus fa-stack-1x fa-inverse"></i>
+													</span>
+												</a>
 										{% endif %}
 									</td>
 								</tr>

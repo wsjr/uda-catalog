@@ -1,9 +1,11 @@
-@import url(http://weloveiconfonts.com/api/?family=fontawesome);
+/*@import url(http://weloveiconfonts.com/api/?family=fontawesome);*/
 
 /* fontawesome */
+/*
 [class*="fontawesome-"]:before {
   font-family: 'FontAwesome', sans-serif;
 }
+*/
 
 body {
 	font-family: "Helvetica Neue", Roboto, Helvetica, Arial, sans-serif;
@@ -68,6 +70,13 @@ body {
 	border: none !important;
 }
 
+.login-table td {
+	vertical-align: top;
+	padding-left: 10px;
+	padding-right: 10px;
+
+}
+
 .category-list-group {
 	border-right: 1px solid rgba(128, 128, 128, 0.5);
 	padding-right: 5px;
@@ -87,6 +96,11 @@ body {
 	padding: 2px 0px 0px 6px;
 }
 
+.spacer {
+	height: 10px;
+}
+
+/*
 [class*="fontawesome-"] {
 	color: #337ab7;
 	cursor: pointer;
@@ -105,15 +119,18 @@ body {
 	display: inline-block;
 	line-height:16px;
 }
+*/
 
 .highlighted {
 	color: white;
 }
 
+/*
 .category-options-left {
 	display: inline-block;
 	padding: 4px 15px;
 }
+*/
 
 .form-table td{
 	padding: 10px !important;
