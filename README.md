@@ -20,6 +20,7 @@ How To Use?
 =============
 Before starting, navigate to ***models*** folder and remove ***catalogwithusers.db***, if there's any, to ensure we have a clean database.
 > cd models
+
 > rm catalogwithusers.db
 
 Populate the database with preset entries
@@ -27,12 +28,13 @@ Populate the database with preset entries
 
 Go up one level and run project.py
 > cd ..
+
 > python project.py
 
 Finally, once the server is running, you can access the catalog app by navigating to:
 > http://localhost:5000/
  or 
- > http://localhost:5000/catalog
+> http://localhost:5000/catalog
 
 In addition, a JSON API is exposed to view all catalog and entries.
 > http://localhost:5000/catalog.json
