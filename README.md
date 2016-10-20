@@ -33,7 +33,9 @@ Go up one level and run **project.py**
 
 Finally, once the server is running, you can access the catalog app by navigating to:
 > http://localhost:5000/
- or 
+
+ or
+  
 > http://localhost:5000/catalog
 
 In addition, a JSON API is exposed to view all catalog and entries.
