@@ -26,7 +26,7 @@ Before starting, navigate to ***models*** folder and remove ***catalogwithusers.
 Populate the database with preset entries
 > python populatecatalog.py
 
-Go up one level and run project.py
+Go up one level and run **project.py**
 > cd ..
 
 > python project.py
