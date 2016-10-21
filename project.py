@@ -21,10 +21,20 @@ APPLICATION_NAME = "Catalog Application"
 
 
 def redirectHome():
+    """
+    Redirect to home page
+    """
     return redirect(url_for('listCatalogsAndLatestItems'))
 
 
 def owner_required_with_params(user_id=None, msg=None):
+    """
+    This method is used to check if the logged in user is actual
+    owner of the category or item attempting to edit or delete.
+    If not, redirects to home page.
+    :user_id: user id to check
+    :msg: message to display
+    """
     if user_id != login_session['user_id']:
         flash(msg)
         return redirectHome()
@@ -49,6 +59,10 @@ def login_required_with_params(msg=None):
 # Create anti-forgery state token
 @app.route('/login')
 def showLogin():
+    """
+    Generates the new state token and redirects user to login
+    screen.
+    """
     state = ''.join(random.choice(string.ascii_uppercase + string.digits)
                     for x in xrange(32))
     login_session['state'] = state
@@ -58,12 +72,18 @@ def showLogin():
 @csrf.exempt
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
+    """
+    Connects using FB credentials
+    """
     output = fbauth.Authentication.connect()
     return output
 
 
 @app.route('/fbdisconnect')
 def fbdisconnect():
+    """
+    Disconnects using FB credentials.
+    """
     output = fbauth.Authentication.disconnect()
     return output
 
@@ -71,12 +91,18 @@ def fbdisconnect():
 @csrf.exempt
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
+    """
+    Connects using GooglePlus credentials.
+    """
     output = gpauth.Authentication.connect()
     return output
 
 
 @app.route('/gdisconnect')
 def gdisconnect():
+    """
+    Disconnects using GooglePlus credentials.
+    """
     output = gpauth.Authentication.disconnect()
     return output
 
@@ -84,6 +110,9 @@ def gdisconnect():
 # JSON ENDPOINT
 @app.route('/catalog/json')
 def getJSON():
+    """
+    Returns JSON object of all the categories and items.
+    """
     # Get all categories
     lCategories = model.Categories.get_all()
 
@@ -109,6 +138,10 @@ def getJSON():
 
 @app.route('/catalog/<string:category>/json')
 def getCategoryJSON(category):
+    """
+    Returns JSON object of a particular category.
+    :category: category desired
+    """
     result = {}
 
     categoryToUse = model.Categories.by_name(name=category)
@@ -132,6 +165,11 @@ def getCategoryJSON(category):
 
 @app.route('/catalog/<string:category>/<string:item>/json')
 def getItemJSON(category, item):
+    """
+    Returns JSON object of a particular item in a category.
+    :category: category desired
+    :item: item desired
+    """
     result = {}
 
     categoryToUse = model.Categories.by_name(name=category)
@@ -147,6 +185,9 @@ def getItemJSON(category, item):
 @app.route('/')
 @app.route('/catalog')
 def listCatalogsAndLatestItems():
+    """
+    Lists all catalogs and latest items.
+    """
     lCategories = model.Categories.get_all()
     lItems = model.Items.get_latest_items()
 
@@ -163,6 +204,9 @@ def listCatalogsAndLatestItems():
 @app.route('/catalog/addcategory', methods=['GET', 'POST'])
 @login_required_with_params("You must be a logged in to add category.")
 def addCategory():
+    """
+    Method for adding a category.
+    """
     if request.method == 'POST':
         name = request.form['name']
 
@@ -197,6 +241,10 @@ def addCategory():
 
 @app.route('/catalog/<string:category>/items', methods=['GET', 'POST'])
 def viewCategory(category):
+    """
+    Method for viewing a category.
+    :category: category desired
+    """
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is not None:
         category_id = categoryToUse.id
@@ -218,6 +266,10 @@ def viewCategory(category):
 @app.route('/catalog/<string:category>/edit', methods=['GET', 'POST'])
 @login_required_with_params("You must be a logged in to edit a category.")
 def editCategory(category):
+    """
+    Method for editing a category.
+    :category: category desired
+    """
     # Check if category exists.
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -262,6 +314,10 @@ def editCategory(category):
 @app.route('/catalog/<string:category>/delete', methods=['GET', 'POST'])
 @login_required_with_params("You must be a logged in to delete a category.")
 def deleteCategory(category):
+    """
+    Method for deleting a category.
+    :category: category desired
+    """
     # Check if category exists
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -298,6 +354,9 @@ def deleteCategory(category):
 @app.route('/catalog/additem', methods=['GET', 'POST'])
 @login_required_with_params("You must be a logged in to add an item.")
 def addItem():
+    """
+    Method for adding an item.
+    """
     page_title = 'Add Item'
     lCategories = model.Categories.get_all()
 
@@ -366,6 +425,10 @@ def addItem():
 @app.route('/catalog/<string:category>/add', methods=['GET', 'POST'])
 @login_required_with_params("You must be logged in to add an item.")
 def addItemToCategory(category):
+    """
+    Method for adding an item to a category.
+    :category: category desired
+    """
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is not None:
         page_title = "Add new item to '{category}' category".format(
@@ -429,6 +492,11 @@ def addItemToCategory(category):
 
 @app.route('/catalog/<string:category>/<string:item>', methods=['GET', 'POST'])
 def viewItem(category, item):
+    """
+    Method for viewing an item in a category.
+    :category: category desired
+    :item: item desired
+    """
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is not None:
         category_id = categoryToUse.id
@@ -451,6 +519,11 @@ def viewItem(category, item):
            methods=['GET', 'POST'])
 @login_required_with_params("You must be a logged in to edit an item.")
 def editItem(category, item):
+    """
+    Method for editing an item in a category.
+    :category: category desired
+    :item: item desired
+    """
     # Check if category exists
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -526,6 +599,11 @@ def editItem(category, item):
            methods=['GET', 'POST'])
 @login_required_with_params("You must be logged in to delete an item.")
 def deleteItem(category, item):
+    """
+    Method for deleting an item in a category.
+    :category: category desired
+    :item: item desired
+    """
     # Check if category exists
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -559,9 +637,11 @@ def deleteItem(category, item):
         return render_template('deleteItem.html', item_title=item)
 
 
-# Disconnect based on provider
 @app.route('/disconnect')
 def disconnect():
+    """
+    Method for disconnecting based on provider.
+    """
     if 'provider' in login_session:
         if login_session['provider'] == 'google':
             gdisconnect()
