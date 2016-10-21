@@ -44,18 +44,18 @@ In addition, There are several JSON API exposed to get data:
 > http://localhost:5000/catalog/json
 
 - To view a particular category:
-> http://localhost:5000/catalog/[string:category]/json
-> 
-> For example, to get the JSON data for **Soccer** category
-> 
-> http://localhost:5000/catalog/Soccer/json
+>> http://localhost:5000/catalog/[string:category]/json
+>
+>*For example, to get the JSON data for **Soccer** category.*
+>
+>> http://localhost:5000/catalog/Soccer/json
 
 - To view a particular item in a category:
-> http://localhost:5000/catalog/[string:category]/[string:item]/json
+>> http://localhost:5000/catalog/[string:category]/[string:item]/json
 > 
-> For example, to get the JSON data for **Padding** item in **Soccer** category
+> *For example, to get the JSON data for **Padding** item in **Soccer** category.*
 > 
-> http://localhost:5000/catalog/Soccer/Padding/json
+>> http://localhost:5000/catalog/Soccer/Padding/json
 
 
 What features are available?
@@ -70,4 +70,5 @@ As a logged in user:
 As a logged out user:
 
  - You can only view categories and items.
+
 
