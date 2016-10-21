@@ -36,10 +36,27 @@ Finally, once the server is running, you can access the catalog app by navigatin
 
  or
   
-> http://localhost:5000/catalog
+> http://localhost:5000/catalog/
 
-In addition, a JSON API is exposed to view all catalog and entries.
-> http://localhost:5000/catalog.json
+In addition, There are several JSON API exposed to get data:
+
+- To view all the categories and items:
+> http://localhost:5000/catalog/json
+
+- To view a particular category:
+> http://localhost:5000/catalog/[string:category]/json
+> 
+> For example, to get the JSON data for **Soccer** category
+> 
+> http://localhost:5000/catalog/Soccer/json
+
+- To view a particular item in a category:
+> http://localhost:5000/catalog/[string:category]/[string:item]/json
+> 
+> For example, to get the JSON data for **Padding** item in **Soccer** category
+> 
+> http://localhost:5000/catalog/Soccer/Padding/json
+
 
 What features are available?
 ==============

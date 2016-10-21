@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, jsonify, \
     url_for, flash
 from flask import session as login_session
+from flask.ext.seasurf import SeaSurf
+from functools import wraps
 from datetime import datetime
 import random
 import string
@@ -10,13 +12,38 @@ from auths import fbauth, gpauth
 
 
 app = Flask(__name__)
+csrf = SeaSurf(app)
 
 APPLICATION_NAME = "Catalog Application"
 
 
-#############
+# UTILITY FUNCTIONS
+
+
+def redirectHome():
+    return redirect(url_for('listCatalogsAndLatestItems'))
+
+
+def owner_required_with_params(user_id=None, msg=None):
+    if user_id != login_session['user_id']:
+        flash(msg)
+        return redirectHome()
+
+
+def login_required_with_params(msg=None):
+    def login_required(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'username' in login_session:
+                return f(*args, **kwargs)
+            else:
+                flash(msg)
+                return redirectHome()
+        return decorated_function
+    return login_required
+
+
 # LOGIN
-############
 
 
 # Create anti-forgery state token
@@ -28,6 +55,7 @@ def showLogin():
     return render_template('login.html', STATE=state)
 
 
+@csrf.exempt
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
     output = fbauth.Authentication.connect()
@@ -40,6 +68,7 @@ def fbdisconnect():
     return output
 
 
+@csrf.exempt
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     output = gpauth.Authentication.connect()
@@ -52,12 +81,8 @@ def gdisconnect():
     return output
 
 
-def redirectHome():
-    return redirect(url_for('listCatalogsAndLatestItems'))
-
-
 # JSON ENDPOINT
-@app.route('/catalog.json')
+@app.route('/catalog/json')
 def getJSON():
     # Get all categories
     lCategories = model.Categories.get_all()
@@ -82,6 +107,43 @@ def getJSON():
     return jsonify(Category=result)
 
 
+@app.route('/catalog/<string:category>/json')
+def getCategoryJSON(category):
+    result = {}
+
+    categoryToUse = model.Categories.by_name(name=category)
+    if categoryToUse is not None:
+        cat_json = categoryToUse.serialize
+
+        # Query items by category id
+        items = model.Items.by_category_id(cid=categoryToUse.id)
+        category_items = []
+        for item in items:
+            # Collect all items in json
+            category_items.append(item.serialize)
+
+        # Modify the category json to add the item json to it.
+        cat_json['Item'] = category_items
+
+        result = cat_json
+
+    return jsonify(result)
+
+
+@app.route('/catalog/<string:category>/<string:item>/json')
+def getItemJSON(category, item):
+    result = {}
+
+    categoryToUse = model.Categories.by_name(name=category)
+    itemToUse = model.Items.by_title_and_cid(title=item,
+                                             cid=categoryToUse.id)
+
+    if itemToUse is not None:
+        result = itemToUse.serialize
+
+    return jsonify(result)
+
+
 @app.route('/')
 @app.route('/catalog')
 def listCatalogsAndLatestItems():
@@ -99,42 +161,38 @@ def listCatalogsAndLatestItems():
 
 
 @app.route('/catalog/addcategory', methods=['GET', 'POST'])
+@login_required_with_params("You must be a logged in to add category.")
 def addCategory():
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be a logged in to add category")
-        return redirectHome()
-    else:
-        if request.method == 'POST':
-            name = request.form['name']
+    if request.method == 'POST':
+        name = request.form['name']
 
-            # Check if its not null
-            if len(name) == 0:
+        # Check if its not null
+        if len(name) == 0:
+            return render_template('addcategory.html',
+                                   page_title='Add Category',
+                                   name=name,
+                                   error='Category must not be empty.')
+        else:
+            # Check if the category exists
+            categoryToUse = model.Categories.by_name(name=name)
+            if categoryToUse is not None:
                 return render_template('addcategory.html',
                                        page_title='Add Category',
                                        name=name,
-                                       error='Category must not be empty.')
+                                       error='Category exists already.')
             else:
-                # Check if the category exists
-                categoryToUse = model.Categories.by_name(name=name)
-                if categoryToUse is not None:
-                    return render_template('addcategory.html',
-                                           page_title='Add Category',
-                                           name=name,
-                                           error='Category exists already.')
-                else:
-                    newCategory = model.Categories.create_entry(
-                        name=name, uid=login_session['user_id'])
+                newCategory = model.Categories.create_entry(
+                    name=name, uid=login_session['user_id'])
 
-                    flash(
-                        "'{category}' Category Successfully Created"
-                        .format(category=newCategory.name))
+                flash(
+                    "'{category}' Category Successfully Created"
+                    .format(category=newCategory.name))
 
-                    return redirect(url_for('viewCategory',
-                                            category=newCategory.name))
-        else:
-            return render_template('addcategory.html',
-                                   page_title='Add Category')
+                return redirect(url_for('viewCategory',
+                                        category=newCategory.name))
+    else:
+        return render_template('addcategory.html',
+                               page_title='Add Category')
 
 
 @app.route('/catalog/<string:category>/items', methods=['GET', 'POST'])
@@ -158,12 +216,8 @@ def viewCategory(category):
 
 
 @app.route('/catalog/<string:category>/edit', methods=['GET', 'POST'])
+@login_required_with_params("You must be a logged in to edit a category.")
 def editCategory(category):
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be a logged in to edit a category.")
-        return redirectHome()
-
     # Check if category exists.
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -171,9 +225,9 @@ def editCategory(category):
         return redirectHome()
 
     # Check Authorization
-    if categoryToUse.user_id != login_session['user_id']:
-        flash("You must be the category owner to edit it.")
-        return redirectHome()
+    owner_required_with_params(
+        user_id=categoryToUse.user_id,
+        msg="You must be the category owner to edit it.")
 
     # Proceed once it passes authentication and authorization checks.
     page_title = "Edit Category"
@@ -206,12 +260,8 @@ def editCategory(category):
 
 
 @app.route('/catalog/<string:category>/delete', methods=['GET', 'POST'])
+@login_required_with_params("You must be a logged in to delete a category.")
 def deleteCategory(category):
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be a logged in to delete a category")
-        return redirectHome()
-
     # Check if category exists
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -219,9 +269,9 @@ def deleteCategory(category):
         return redirectHome()
 
     # Check Authorization
-    if categoryToUse.user_id != login_session['user_id']:
-        flash("You must be the category owner to delete it.")
-        return redirectHome()
+    owner_required_with_params(
+        user_id=categoryToUse.user_id,
+        msg="You must be the category owner to delete it.")
 
     # Proceed once it passes authentication and authorization checks.
     if request.method == 'POST':
@@ -246,60 +296,27 @@ def deleteCategory(category):
 
 
 @app.route('/catalog/additem', methods=['GET', 'POST'])
+@login_required_with_params("You must be a logged in to add an item.")
 def addItem():
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be a logged in to add an item")
-        return redirectHome()
-    else:
-        page_title = 'Add Item'
-        lCategories = model.Categories.get_all()
+    page_title = 'Add Item'
+    lCategories = model.Categories.get_all()
 
-        if request.method == 'POST':
-            item_title = request.form['item_title']
-            item_description = request.form['item_description']
-            category_id = int(request.form['category_id'])
-            error = ""
+    if request.method == 'POST':
+        item_title = request.form['item_title']
+        item_description = request.form['item_description']
+        category_id = int(request.form['category_id'])
+        error = ""
 
-            if len(item_title) > 0 and len(item_description) > 0\
-                    and category_id > 0:
-                # Ensure the item doesn't exist already
-                itemToUse = model.Items.by_title_and_cid(
-                    title=item_title, cid=category_id)
-                categoryToUse = model.Categories.by_id(cid=category_id)
-                if itemToUse is not None:
-                    error = "'{i}' already exists under '{c}' Category".\
-                        format(i=item_title,
-                               c=categoryToUse.name)
-                    return render_template('additem.html',
-                                           page_title=page_title,
-                                           error=error,
-                                           item_title=item_title,
-                                           item_description=item_description,
-                                           category_id=category_id,
-                                           category=None,
-                                           categories=lCategories)
-                else:
-                    newItem = model.Items.create_entry(
-                        title=item_title,
-                        description=item_description,
-                        cid=category_id,
-                        uid=login_session['user_id'])
-
-                    flash(
-                        "'{item}' Item Successfully Created"
-                        .format(item=newItem.title))
-
-                    return redirect(url_for('viewCategory',
-                                            category=categoryToUse.name))
-            else:
-                if len(item_title) == 0:
-                    error = 'Please provide a title.'
-                elif len(item_description) == 0:
-                    error = 'Please provide a description.'
-                elif category_id == -1:
-                    error = 'Please select a category.'
-
+        if len(item_title) > 0 and len(item_description) > 0\
+                and category_id > 0:
+            # Ensure the item doesn't exist already
+            itemToUse = model.Items.by_title_and_cid(
+                title=item_title, cid=category_id)
+            categoryToUse = model.Categories.by_id(cid=category_id)
+            if itemToUse is not None:
+                error = "'{i}' already exists under '{c}' Category".\
+                    format(i=item_title,
+                           c=categoryToUse.name)
                 return render_template('additem.html',
                                        page_title=page_title,
                                        error=error,
@@ -308,83 +325,106 @@ def addItem():
                                        category_id=category_id,
                                        category=None,
                                        categories=lCategories)
+            else:
+                newItem = model.Items.create_entry(
+                    title=item_title,
+                    description=item_description,
+                    cid=category_id,
+                    uid=login_session['user_id'])
+
+                flash(
+                    "'{item}' Item Successfully Created"
+                    .format(item=newItem.title))
+
+                return redirect(url_for('viewCategory',
+                                        category=categoryToUse.name))
         else:
-            # Display the drop down list and let user pick the category
-            lCategories = model.Categories.get_all()
+            if len(item_title) == 0:
+                error = 'Please provide a title.'
+            elif len(item_description) == 0:
+                error = 'Please provide a description.'
+            elif category_id == -1:
+                error = 'Please select a category.'
+
             return render_template('additem.html',
                                    page_title=page_title,
+                                   error=error,
+                                   item_title=item_title,
+                                   item_description=item_description,
+                                   category_id=category_id,
                                    category=None,
                                    categories=lCategories)
+    else:
+        # Display the drop down list and let user pick the category
+        lCategories = model.Categories.get_all()
+        return render_template('additem.html',
+                               page_title=page_title,
+                               category=None,
+                               categories=lCategories)
 
 
 @app.route('/catalog/<string:category>/add', methods=['GET', 'POST'])
+@login_required_with_params("You must be logged in to add an item.")
 def addItemToCategory(category):
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be logged in to add an item")
-        return redirectHome()
-    else:
-        categoryToUse = model.Categories.by_name(name=category)
-        if categoryToUse is not None:
-            page_title = "Add new item to '{category}' category".format(
-                category=categoryToUse.name)
-            if request.method == 'POST':
-                item_title = request.form['item_title']
-                item_description = request.form['item_description']
-                category_id = request.form['category_id']
-                error = ""
+    categoryToUse = model.Categories.by_name(name=category)
+    if categoryToUse is not None:
+        page_title = "Add new item to '{category}' category".format(
+            category=categoryToUse.name)
+        if request.method == 'POST':
+            item_title = request.form['item_title']
+            item_description = request.form['item_description']
+            category_id = request.form['category_id']
+            error = ""
 
-                if len(item_title) > 0 and len(item_description) > 0\
-                        and category_id > 0:
-                    # Ensure the item doesn't exist already
-                    itemToUse = model.Items.by_title_and_cid(
-                        title=item_title, cid=category_id)
-                    if itemToUse is not None:
-                        error = "'{item}' already exists in '{category}'"\
-                                .format(item=item_title,
-                                        category=categoryToUse.name)
-                        return render_template(
-                            'additem.html',
-                            page_title=page_title,
-                            error=error,
-                            item_title=item_title,
-                            item_description=item_description,
-                            category_id=category_id,
-                            category=categoryToUse,
-                            categories=None)
-                    else:
-                        model.Items.create_entry(title=item_title,
-                                                 description=item_description,
-                                                 cid=categoryToUse.id,
-                                                 uid=login_session['user_id'])
-
-                        flash(
-                            "'{i}' Item Successfully Created in '{c}'"
-                            .format(i=item_title, c=categoryToUse.name))
-
-                        return redirect(url_for('viewCategory',
-                                                category=categoryToUse.name))
+            if len(item_title) > 0 and len(item_description) > 0\
+                    and category_id > 0:
+                # Ensure the item doesn't exist already
+                itemToUse = model.Items.by_title_and_cid(
+                    title=item_title, cid=category_id)
+                if itemToUse is not None:
+                    error = "'{item}' already exists in '{category}'"\
+                            .format(item=item_title,
+                                    category=categoryToUse.name)
+                    return render_template(
+                        'additem.html',
+                        page_title=page_title,
+                        error=error,
+                        item_title=item_title,
+                        item_description=item_description,
+                        category_id=category_id,
+                        category=categoryToUse,
+                        categories=None)
                 else:
-                    if len(item_title) == 0:
-                        error = 'Please provide a title.'
-                    elif len(item_description) == 0:
-                        error = 'Please provide a description.'
+                    model.Items.create_entry(title=item_title,
+                                             description=item_description,
+                                             cid=categoryToUse.id,
+                                             uid=login_session['user_id'])
 
-                    return render_template('additem.html',
-                                           page_title=page_title,
-                                           item_title=item_title,
-                                           item_description=item_description,
-                                           category=categoryToUse,
-                                           categories=None,
-                                           error=error)
+                    flash(
+                        "'{i}' Item Successfully Created in '{c}'"
+                        .format(i=item_title, c=categoryToUse.name))
+
+                    return redirect(url_for('viewCategory',
+                                            category=categoryToUse.name))
             else:
-                # Display the drop down list and let user pick the category
+                if len(item_title) == 0:
+                    error = 'Please provide a title.'
+                elif len(item_description) == 0:
+                    error = 'Please provide a description.'
+
                 return render_template('additem.html',
                                        page_title=page_title,
+                                       item_title=item_title,
+                                       item_description=item_description,
                                        category=categoryToUse,
-                                       categories=None)
+                                       categories=None,
+                                       error=error)
         else:
-            return redirectHome()
+            # Display the drop down list and let user pick the category
+            return render_template('additem.html',
+                                   page_title=page_title,
+                                   category=categoryToUse,
+                                   categories=None)
 
 
 @app.route('/catalog/<string:category>/<string:item>', methods=['GET', 'POST'])
@@ -409,12 +449,8 @@ def viewItem(category, item):
 
 @app.route('/catalog/<string:category>/<string:item>/edit',
            methods=['GET', 'POST'])
+@login_required_with_params("You must be a logged in to edit an item.")
 def editItem(category, item):
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be a logged in to edit an item")
-        return redirectHome()
-
     # Check if category exists
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -428,9 +464,9 @@ def editItem(category, item):
         return redirectHome()
 
     # Check Authorization
-    if itemToUse.user_id != login_session['user_id']:
-        flash("You must be the item owner to edit it.")
-        return redirectHome()
+    owner_required_with_params(
+        user_id=itemToUse.user_id,
+        msg="You must be the item owner to edit it.")
 
     # Proceed once it passes authentication and authorization.
     lCategories = model.Categories.get_all()
@@ -488,12 +524,8 @@ def editItem(category, item):
 
 @app.route('/catalog/<string:category>/<string:item>/delete',
            methods=['GET', 'POST'])
+@login_required_with_params("You must be logged in to delete an item.")
 def deleteItem(category, item):
-    # Check Authentication
-    if 'username' not in login_session:
-        flash("You must be logged in to delete an item")
-        return redirectHome()
-
     # Check if category exists
     categoryToUse = model.Categories.by_name(name=category)
     if categoryToUse is None:
@@ -507,9 +539,9 @@ def deleteItem(category, item):
         return redirectHome()
 
     # Check Authorization
-    if itemToUse.user_id != login_session['user_id']:
-        flash("You must be the item owner to delete it.")
-        return redirectHome()
+    owner_required_with_params(
+        user_id=itemToUse.user_id,
+        msg="You must be the item owner to delete it.")
 
     # Proceed once it passes authentication and authorization.
     category_id = categoryToUse.id
@@ -552,5 +584,5 @@ def disconnect():
 
 if __name__ == '__main__':
     app.secret_key = 'my_catalog_app_secret_key'
-    app.debug = True
+    app.debug = False
     app.run(host='0.0.0.0', port=5000)
